@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Plotline: chart bot</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0b1118;
+        --panel: #131d28;
+        --ink: #e8edf4;
+        --mute: #a1adbc;
+        --line: #2a3747;
+        --acc: #6c8cff;
+        --on: #0f1620;
+        --warn: #ffad78;
+        --grid: #314052;
+        color-scheme: dark;
+        box-sizing: border-box;
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --bg: #0f1620;
+          --panel: #171f2b;
+          --ink: #e8edf4;
+          --mute: #93a0b2;
+          --line: #2a3444;
+          --acc: #6c8cff;
+          --on: #0f1620;
+          --warn: #f0a263;
+          --grid: #263041;
+        }
+      }
+
+      :root[data-theme="dark"] {
+        --bg: #0f1620;
+        --panel: #171f2b;
+        --ink: #e8edf4;
+        --mute: #93a0b2;
+        --line: #2a3444;
+        --acc: #6c8cff;
+        --on: #0f1620;
+        --warn: #f0a263;
+        --grid: #263041;
+      }
+
+      html {
+        scroll-padding-top: env(safe-area-inset-top, 0px);
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: inherit;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 15px/1.5 "Schibsted Grotesk", system-ui, sans-serif;
+      }
+
+      .app {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px 16px 40px;
+      }
+
+      header h1 {
+        font-size: 26px;
+        margin: 0;
+        letter-spacing: -0.02em;
+      }
+
+      header p {
+        margin: 4px 0 20px;
+        color: var(--mute);
+        max-width: 60ch;
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+        gap: 16px;
+        align-items: start;
+      }
+
+      @media (max-width: 900px) {
+        main {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+
+      h2 {
+        font-size: 15px;
+        margin: 0 0 10px;
+      }
+
+      textarea,
+      input:not([type="checkbox"]):not([type="color"]),
+      select {
+        width: 100%;
+        font: inherit;
+        color: var(--ink);
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px 10px;
+      }
+
+      textarea {
+        resize: vertical;
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 13px;
+      }
+
+      button {
+        font: inherit;
+        cursor: pointer;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--ink);
+        border-radius: 8px;
+        padding: 7px 12px;
+      }
+
+      button.pri {
+        background: var(--acc);
+        color: var(--on);
+        border-color: var(--acc);
+        font-weight: 600;
+      }
+
+      :focus-visible {
+        outline: 2px solid var(--acc);
+        outline-offset: 2px;
+      }
+
+      .row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+        align-items: center;
+      }
+
+      .row > input:not([type="checkbox"]):not([type="color"]) {
+        flex: 1;
+        min-width: 0;
+        width: auto;
+      }
+
+      label {
+        display: block;
+        font-size: 13px;
+        color: var(--mute);
+        margin-top: 10px;
+      }
+
+      label input:not([type="checkbox"]):not([type="color"]),
+      label select {
+        margin-top: 4px;
+      }
+
+      .two {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .seg {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+        margin-bottom: 4px;
+      }
+
+      .seg button[aria-pressed="true"] {
+        background: var(--acc);
+        color: var(--on);
+        border-color: var(--acc);
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 4px;
+      }
+
+      .chips label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0;
+        padding: 4px 8px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--ink);
+      }
+
+      .chips input[type="color"] {
+        width: 20px;
+        height: 20px;
+        padding: 0;
+        border: 0;
+        background: none;
+      }
+
+      .chk {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        align-self: end;
+      }
+
+      .cv {
+        position: relative;
+        height: 420px;
+        margin-top: 8px;
+      }
+
+      @media (max-width: 600px) {
+        .cv {
+          height: 320px;
+        }
+      }
+
+      ul {
+        margin: 0 0 14px;
+        padding-left: 18px;
+      }
+
+      li {
+        margin: 4px 0;
+      }
+
+      .mute {
+        color: var(--mute);
+        font-size: 13px;
+        margin: 0;
+      }
+
+      .err {
+        color: var(--warn);
+        margin: 8px 0 0;
+        font-size: 13px;
+      }
+
+      .tg {
+        position: fixed;
+        left: 50%;
+        bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+        transform: translateX(-50%);
+        background: var(--ink);
+        color: var(--bg);
+        padding: 8px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        max-width: 90%;
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body >
+    <div class="app">
+      <header>
+        <h1>Plotline</h1>
+        <p>
+          Paste, upload or describe your data. Plotline picks a chart that
+          fits, says what it sees, and never fills in gaps. Everything runs
+          in your browser.
+        </p>
+      </header>
+
+      <main>
+        <aside>
+          <section class="card">
+            <h2>Your data</h2>
+            <textarea
+              id="src"
+              rows="7"
+              aria-label="Data"
+              placeholder="Paste a table, CSV or JSON, or type numbers like: Jan 120, Feb 135, Mar 98"
+            ></textarea>
+            <div class="row">
+              <button class="pri" id="go">Build chart</button>
+              <button id="up">Upload file</button>
+              <button id="smp">Try sample</button>
+              <input
+                type="file"
+                id="file"
+                hidden
+                accept=".csv,.tsv,.txt,.json,.xlsx,.xls"
+              />
+            </div>
+            <p id="err" class="err" role="alert"></p>
+          </section>
+
+          <section class="card" id="ctl" hidden>
+            <h2>Ask for a change</h2>
+            <div class="row" style="margin-top: 0">
+              <input
+                id="cmd"
+                aria-label="Instruction"
+                placeholder='"make this a bar chart", "show only 2025"'
+              />
+              <button id="ask">Apply</button>
+            </div>
+            <p id="reply" class="mute" aria-live="polite" style="margin: 8px 0 16px"></p>
+
+            <h2>Customize</h2>
+            <div id="types" class="seg"></div>
+            <label>
+              X axis
+              <select id="xs"></select>
+            </label>
+            <div style="margin-top: 10px">
+              <span class="mute">Y values</span>
+              <div id="ys" class="chips"></div>
+            </div>
+            <label>
+              Title
+              <input id="ttl" />
+            </label>
+            <div class="two">
+              <label>
+                X label
+                <input id="xl" />
+              </label>
+              <label>
+                Y label
+                <input id="yl" />
+              </label>
+            </div>
+            <div class="two">
+              <label>
+                Palette
+                <select id="pal"></select>
+              </label>
+              <label class="chk">
+                <input type="checkbox" id="lg" checked /> Show legend
+              </label>
+            </div>
+          </section>
+        </aside>
+
+        <section>
+          <div class="card" id="empty">
+            <h2>Start with your data</h2>
+            <p class="mute">
+              Paste a table, CSV or JSON, upload a CSV, Excel or JSON file,
+              or type numbers in plain language. Plotline finds the columns,
+              picks a chart, and points out trends and outliers. Missing values
+              stay missing.
+            </p>
+          </div>
+
+          <div id="res" hidden>
+            <div class="card">
+              <p id="why" class="mute"></p>
+              <div class="cv">
+                <canvas id="cv" role="img" aria-label="Chart"></canvas>
+              </div>
+              <div class="row" id="exp">
+                <span class="mute">Export</span>
+                <button data-k="png">PNG</button>
+                <button data-k="svg">SVG</button>
+                <button data-k="pdf">PDF</button>
+                <button data-k="csv">CSV</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <h2>What this shows</h2>
+              <ul id="sum"></ul>
+              <h2>Data checks</h2>
+              <ul id="chk"></ul>
+              <p id="cols" class="mute"></p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="tg" id="tg" hidden role="status"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+const P={Studio:["#2F5BEA","#E8833A","#1E9E8A","#8B5CF6","#D6455D","#6B7A8F","#C9A227","#3B9AE1"],Cool:["#1D4E89","#00B2CA","#7DCFB6","#5E60CE","#4EA8DE","#2A9D8F","#3A0CA3","#48BFE3"],Warm:["#C8553D","#F28F3B","#F5CB5C","#8C2F39","#B08968","#E76F51","#6D597A","#E9C46A"],Mono:["#1B2A41","#324A5F","#546A7B","#7C8FA0","#A5B4C2","#C5D0DA","#0C1821","#8D99AE"]};
+const T=[['bar','Bar'],['stacked','Stacked'],['line','Line'],['area','Area'],['pie','Pie'],['scatter','Scatter']];
+const $=s=>document.querySelector(s),esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fm=n=>new Intl.NumberFormat('en',{maximumFractionDigits:2}).format(n);
+let S={rows:[],cols:[],cfg:null,rec:null,filterText:'',f:{col:'',text:'',top:0,sort:''}},ch=null;
+const num=v=>{if(typeof v==='number')return isFinite(v)?v:NaN;if(typeof v!=='string')return NaN;const t=v.trim().replace(/^\((.*)\)$/,'-$1').replace(/[$€£₹,\s]/g,'').replace(/%$/,'');return /^-?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(t)?parseFloat(t):NaN};
+const miss=v=>v==null||/^(|na|n\/a|null|none|nan|-|--|\?)$/i.test(String(v).trim());
+const MON='(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*';
+const isDt=v=>{const t=String(v).trim();return /^\d{4}[-\/]\d{1,2}([-\/]\d{1,2})?$/.test(t)||/^\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}$/.test(t)||new RegExp('^'+MON+'([\\s\\-\']*\\d{2,4})?$','i').test(t)||/^Q[1-4]([\s\-']*\d{2,4})?$/i.test(t)||/^\d{4}\s*Q[1-4]$/i.test(t)};
+const dk=(c,v)=>c.yr?num(v):Date.parse(v);
+const say=(m)=>$('#err').textContent=m||'';
+let tt;const toast=m=>{const e=$('#tg');e.textContent=m;e.hidden=false;clearTimeout(tt);tt=setTimeout(()=>e.hidden=true,3200)};
+
+/* ---------- parsing ---------- */
+function fromJSON(j){
+ if(Array.isArray(j)){if(j.length&&Array.isArray(j[0])){const h=j[0].map(String);return j.slice(1).map(r=>Object.fromEntries(h.map((k,i)=>[k,r[i]])))}
+  if(j.length&&typeof j[0]=='object'&&j[0]!==null)return j;return j.map((v,i)=>({Item:'#'+(i+1),Value:v}))}
+ if(j&&typeof j=='object'){const v=Object.values(j);
+  if(v.length&&v.every(Array.isArray)){const n=Math.max(...v.map(a=>a.length)),k=Object.keys(j);return Array.from({length:n},(_,i)=>Object.fromEntries(k.map(c=>[c,j[c][i]])))}
+  if(v.every(x=>typeof x!='object'||x===null))return Object.entries(j).map(([k,x])=>({Label:k,Value:x}));
+  const a=v.find(Array.isArray);if(a)return fromJSON(a)}
+ throw Error('That JSON is not a table I can chart. Use an array of objects or an object of arrays.')}
+function parse(t){t=t.trim();if(!t)throw Error('Paste or upload some data first.');
+ let j;try{j=JSON.parse(t)}catch(e){}if(j!==undefined&&typeof j=='object')return fromJSON(j);
+ const nl=()=>{const r=[];t.split(/;|\n|,(?!\d{3}\b)|\s+and\s+/i).forEach(s=>{const m=s.trim().match(/^(.*?\S)[\s:=\-–]+[$€£₹]?(-?[\d.,]*\d)\s*%?$/);if(m)r.push({Label:m[1],Value:m[2]})});return r};
+ if(!/\n/.test(t)){const r=nl();if(r.length>=2)return r}
+ let c=t;if(/^[^\n]*\|/.test(t))c=t.split('\n').filter(l=>!/^[\s|:\-]+$/.test(l)).map(l=>l.replace(/^\s*\||\|\s*$/g,'')).join('\n');
+ const p=Papa.parse(c,{header:true,skipEmptyLines:'greedy',transformHeader:h=>h.trim(),transform:v=>v.trim()}),f=p.meta.fields||[];
+ if(f.length<2){const r=nl();if(r.length>=2)return r}
+ if(f.length<2||!p.data.length)throw Error('I could not read a table from that. Include a header row and at least one row of values, or type pairs like "Jan 120, Feb 135".');
+ return p.data}
+
+/* ---------- analysis ---------- */
+function inspect(){const names=Object.keys(S.rows[0]);S.cols=names.map(name=>{const raw=S.rows.map(r=>r[name]),nm=raw.filter(v=>!miss(v)),n=nm.length,nn=nm.filter(v=>!isNaN(num(v))).length;let type='cat',yr=false;
+ if(n&&nn/n>=.8){type='num';if(/year|yr|fy/i.test(name)&&nm.every(v=>Number.isInteger(num(v))&&num(v)>1899&&num(v)<2101)){type='date';yr=true}}
+ else if(n&&nm.filter(isDt).length/n>=.8)type='date';
+ return{name,type,yr,sortable:type=='date'&&(yr||nm.every(v=>isFinite(Date.parse(v)))),missing:raw.length-n,invalid:type=='num'?n-nn:0}})}
+function auto(){const c=S.cols,nums=c.filter(k=>k.type=='num'),dt=c.find(k=>k.type=='date'),ct=c.find(k=>k.type=='cat'),x=dt||ct;let ys,type,why;
+ if(x){ys=nums.slice(0,6);if(!ys.length)return null;
+  const cnt=new Set(S.rows.map(r=>r[x.name])).size,vals=S.rows.map(r=>num(r[ys[0].name])).filter(v=>!isNaN(v)),sum=vals.reduce((a,b)=>a+b,0);
+  const nonneg=ys.every(y=>S.rows.every(r=>!(num(r[y.name])<0)));
+  if(dt){type='line';why='The first column is a time sequence, so a line shows how values change.'}
+  else if(ys.length==1&&cnt<=6&&nonneg&&(/share|percent|pct|%|proportion/i.test(ys[0].name)||Math.abs(sum-100)<1.5)){type='pie';why='A few categories that add up to a whole, so a pie shows each share.'}
+  else if(ys.length>=3&&nonneg&&cnt<=12){type='stacked';why='Several non-negative series per category, so stacked bars show totals and composition. Switch to Bar to compare series directly.'}
+  else{type='bar';why='Comparing values across categories, so bars are the easiest to read.'}
+ }else if(nums.length>=2){x=nums[0];ys=[nums[1]];type='scatter';why='Two numeric columns and no category or date, so a scatter plot shows how they relate.'}
+ else return null;
+ return{x:x.name,ys:ys.map(y=>y.name),type,why};
+}
+
+function normalizeRows(rows){
+ if(!Array.isArray(rows))throw Error('The file does not contain a table.');
+ const records=rows.filter(row=>row&&typeof row==='object'&&!Array.isArray(row));
+ if(!records.length)throw Error('The file does not contain any data rows.');
+ const names=[...new Set(records.flatMap(row=>Object.keys(row)))].map((name,index)=>String(name||`Column ${index+1}`).trim()||`Column ${index+1}`);
+ if(names.length<2)throw Error('Include at least two columns: one label column and one values column.');
+ const result=records.map(row=>Object.fromEntries(names.map(name=>[name,row[name]??''])))
+  .filter(row=>Object.values(row).some(value=>!miss(value)));
+ if(!result.length)throw Error('The file contains headers but no data rows.');
+ return result;
+}
+
+function rowsFromText(text,delimiter){
+ if(!window.Papa)throw Error('The data parser did not load. Check your internet connection and reload the page.');
+ if(delimiter){
+  const parsed=Papa.parse(text,{header:true,delimiter,skipEmptyLines:'greedy',transformHeader:header=>header.trim(),transform:value=>value.trim()});
+  if(parsed.errors.some(error=>error.type==='Delimiter'))throw Error('I could not detect the columns in this file.');
+  return normalizeRows(parsed.data);
+ }
+ return normalizeRows(parse(text));
+}
+
+async function rowsFromFile(file){
+ const name=file.name.toLowerCase(),extension=name.split('.').pop();
+ if(['xlsx','xls'].includes(extension)){
+  if(!window.XLSX)throw Error('The Excel reader did not load. Check your internet connection and reload the page.');
+  const workbook=XLSX.read(await file.arrayBuffer(),{type:'array'});
+  const sheet=workbook.Sheets[workbook.SheetNames[0]];
+  if(!sheet)throw Error('This Excel file has no worksheets.');
+  return normalizeRows(fromJSON(XLSX.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false})));
+ }
+ const text=await file.text();
+ if(extension==='json')return normalizeRows(fromJSON(JSON.parse(text)));
+ if(extension==='tsv')return rowsFromText(text,'\t');
+ if(['csv','txt'].includes(extension))return rowsFromText(text);
+ throw Error('Choose a CSV, TSV, TXT, JSON, XLS, or XLSX file.');
+}
+
+function makeConfig(recommendation){
+ return{x:recommendation.x,ys:recommendation.ys,type:recommendation.type,title:'',xLabel:recommendation.x,yLabel:'',palette:'Studio',legend:true};
+}
+
+function fillControls(){
+ const config=S.cfg;
+ $('#types').innerHTML=T.map(([value,label])=>`<button type="button" data-type="${value}" aria-pressed="${config.type===value}">${label}</button>`).join('');
+ $('#types').querySelectorAll('button').forEach(button=>button.addEventListener('click',()=>{config.type=button.dataset.type;fillControls();drawChart()}));
+ $('#xs').innerHTML=S.cols.map(column=>`<option value="${esc(column.name)}">${esc(column.name)}</option>`).join('');
+ $('#xs').value=config.x;
+ $('#xs').onchange=()=>{config.x=$('#xs').value;drawChart()};
+ $('#ys').innerHTML=S.cols.filter(column=>column.type==='num').map(column=>`<label><input type="checkbox" value="${esc(column.name)}" ${config.ys.includes(column.name)?'checked':''}>${esc(column.name)}</label>`).join('');
+ $('#ys').querySelectorAll('input').forEach(input=>input.addEventListener('change',()=>{
+  config.ys=[...$('#ys').querySelectorAll('input:checked')].map(item=>item.value);
+  drawChart();
+ }));
+ $('#pal').innerHTML=Object.keys(P).map(name=>`<option value="${name}">${name}</option>`).join('');
+ $('#pal').value=config.palette;
+ $('#pal').onchange=()=>{config.palette=$('#pal').value;drawChart()};
+ $('#ttl').value=config.title;
+ $('#ttl').oninput=()=>{config.title=$('#ttl').value;drawChart()};
+ $('#xl').value=config.xLabel;
+ $('#xl').oninput=()=>{config.xLabel=$('#xl').value;drawChart()};
+ $('#yl').value=config.yLabel;
+ $('#yl').oninput=()=>{config.yLabel=$('#yl').value;drawChart()};
+ $('#lg').checked=config.legend;
+ $('#lg').onchange=()=>{config.legend=$('#lg').checked;drawChart()};
+}
+
+function visibleRows(){
+ if(!S.filterText)return S.rows;
+ const query=S.filterText.toLowerCase();
+ return S.rows.filter(row=>Object.values(row).some(value=>String(value??'').toLowerCase().includes(query)));
+}
+
+function drawChart(){
+ if(!window.Chart)throw Error('The chart library did not load. Check your internet connection and reload the page.');
+ if(ch){ch.destroy();ch=null}
+ const config=S.cfg;
+ if(!config.ys.length)throw Error('Select at least one numeric column for the chart.');
+ const rows=visibleRows();
+ const colors=P[config.palette]||P.Studio;
+ const type=config.type==='stacked'?'bar':config.type==='area'?'line':config.type;
+ let data;
+ if(config.type==='scatter'){
+  const xColumn=S.cols.find(column=>column.name===config.x);
+  if(!xColumn||xColumn.type!=='num')throw Error('Scatter charts need a numeric X axis. Choose one in the X axis menu.');
+  data={datasets:config.ys.map((name,index)=>({label:name,data:rows.map(row=>({x:num(row[config.x]),y:num(row[name])})).filter(point=>isFinite(point.x)&&isFinite(point.y)),backgroundColor:colors[index%colors.length]}))};
+ }else{
+  const labels=rows.map(row=>String(row[config.x]??''));
+  const series=config.type==='pie'?config.ys.slice(0,1):config.ys;
+  data={labels,datasets:series.map((name,index)=>({label:name,data:rows.map(row=>miss(row[name])?null:num(row[name])),backgroundColor:config.type==='pie'?labels.map((_,item)=>colors[item%colors.length]):colors[index%colors.length],borderColor:colors[index%colors.length],borderWidth:2,tension:.25,fill:config.type==='area'}))};
+ }
+ const ink=getComputedStyle(document.documentElement).getPropertyValue('--ink').trim();
+ const mute=getComputedStyle(document.documentElement).getPropertyValue('--mute').trim();
+ const grid=getComputedStyle(document.documentElement).getPropertyValue('--grid').trim();
+ const options={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:config.legend,labels:{color:mute}},title:{display:Boolean(config.title),text:config.title,color:ink}},scales:{}};
+ if(!['pie'].includes(config.type)){
+  options.scales={x:{title:{display:Boolean(config.xLabel),text:config.xLabel,color:mute},ticks:{color:mute},grid:{color:grid},stacked:config.type==='stacked'},y:{title:{display:Boolean(config.yLabel),text:config.yLabel,color:mute},ticks:{color:mute},grid:{color:grid},stacked:config.type==='stacked',beginAtZero:config.type==='bar'||config.type==='stacked'}};
+ }
+ ch=new Chart($('#cv'),{type,data,options});
+ say('');
+}
+
+function updateReport(recommendation){
+ const rows=visibleRows(),counts=rows.length;
+ const descriptions=[`${counts} data row${counts===1?'':'s'} across ${S.cols.length} columns.`];
+ if(recommendation)descriptions.push(recommendation.why);
+ if(S.filterText)descriptions.push(`Filtered to rows matching "${S.filterText}".`);
+ const selected=S.cfg.ys[0],values=selected?rows.map(row=>num(row[selected])).filter(Number.isFinite):[];
+ if(values.length){const high=Math.max(...values),low=Math.min(...values);descriptions.push(`${selected} ranges from ${fm(low)} to ${fm(high)}.`)}
+ $('#sum').replaceChildren(...descriptions.map(text=>{const item=document.createElement('li');item.textContent=text;return item}));
+ const warnings=[];
+ for(const column of S.cols){
+  if(column.missing)warnings.push(`${column.name}: ${column.missing} missing value${column.missing===1?'':'s'}.`);
+  if(column.invalid)warnings.push(`${column.name}: ${column.invalid} non-numeric value${column.invalid===1?'':'s'} ignored in charts.`);
+ }
+ if(!warnings.length)warnings.push('No missing or invalid values found.');
+ $('#chk').replaceChildren(...warnings.map(text=>{const item=document.createElement('li');item.textContent=text;return item}));
+ $('#cols').textContent=`Columns: ${S.cols.map(column=>`${column.name} (${column.type})`).join(', ')}`;
+ $('#why').textContent=recommendation?.why||'Chart generated from the selected columns.';
+}
+
+function loadRows(rows){
+ S.rows=normalizeRows(rows);
+ S.filterText='';
+ inspect();
+ const recommendation=auto();
+ if(!recommendation)throw Error('I could not find a category or date column and a numeric values column.');
+ S.rec=recommendation;
+ S.cfg=makeConfig(recommendation);
+ $('#empty').hidden=true;
+ $('#res').hidden=false;
+ $('#ctl').hidden=false;
+ fillControls();
+ updateReport(recommendation);
+ drawChart();
+}
+
+function download(name,content,type){
+ const url=URL.createObjectURL(new Blob([content],{type}));
+ const link=document.createElement('a');link.href=url;link.download=name;link.click();
+ URL.revokeObjectURL(url);
+}
+
+$('#up').addEventListener('click',()=>$('#file').click());
+$('#file').addEventListener('change',async event=>{
+ const file=event.target.files?.[0];
+ if(!file)return;
+ try{loadRows(await rowsFromFile(file));toast(`Loaded ${file.name}`)}
+ catch(error){say(error.message||'I could not read that file.')}
+ finally{event.target.value=''}
+});
+$('#go').addEventListener('click',()=>{try{loadRows(parse($('#src').value))}catch(error){say(error.message||'I could not read that data.')}});
+$('#src').addEventListener('keydown',event=>{if(event.ctrlKey&&event.key==='Enter')$('#go').click()});
+$('#smp').addEventListener('click',()=>{
+  $('#src').value='Month,Visitors,Signups\nJan,120,24\nFeb,155,31\nMar,138,29\nApr,192,42\nMay,176,39';
+  $('#go').click();
+});
+$('#ask').addEventListener('click',()=>{
+ const request=$('#cmd').value.trim().toLowerCase();
+ if(!request){$('#reply').textContent='Enter a chart change first.';return}
+ if(!S.cfg){$('#reply').textContent='Build a chart from data before applying changes.';return}
+ const requested=[...T].sort((a,b)=>b[0].length-a[0].length).find(([value,label])=>new RegExp(`\\b(?:${value}|${label.toLowerCase()})\\b`).test(request));
+ const filterMatch=request.match(/(?:show|keep)\s+only\s+(.+)$|filter\s+(?:to|only)\s+(.+)$|^only\s+(.+)$/);
+ const clearFilter=/\b(?:show all|all data|clear filter|reset filter)\b/.test(request);
+ const filterValue=filterMatch?.slice(1).find(Boolean)?.replace(/^['"]|['"]$/g,'').replace(/[.!?]+$/,'').trim();
+ if(!requested&&!filterValue&&!clearFilter){$('#reply').textContent='Try a chart type, "show only 2025", or "show all".';return}
+ const nextFilter=clearFilter?'':filterValue||S.filterText;
+ const matchingRows=nextFilter?S.rows.filter(row=>Object.values(row).some(value=>String(value??'').toLowerCase().includes(nextFilter.toLowerCase()))):S.rows;
+ if(!matchingRows.length){$('#reply').textContent=`No rows match "${nextFilter}". The chart was not changed.`;return}
+ const changes=[];
+ if(requested){S.cfg.type=requested[0];changes.push(`Changed to ${requested[1]} chart`)}
+ if(filterValue){S.filterText=filterValue;changes.push(`Showing ${matchingRows.length} matching row${matchingRows.length===1?'':'s'}`)}
+ if(clearFilter){S.filterText='';changes.push(`Showing all ${S.rows.length} rows`)}
+ fillControls();
+ updateReport(S.rec);
+ drawChart();
+ $('#reply').textContent=`${changes.join('. ')}.`;
+});
+$('#exp').addEventListener('click',event=>{
+ const kind=event.target.dataset.k;
+ if(!kind||!ch)return;
+ try{
+  if(kind==='png')download('plotline-chart.png',ch.toBase64Image().split(',')[1]&&Uint8Array.from(atob(ch.toBase64Image().split(',')[1]),char=>char.charCodeAt(0)), 'image/png');
+  else if(kind==='csv')download('plotline-data.csv',Papa.unparse(visibleRows()),'text/csv;charset=utf-8');
+  else if(kind==='svg')download('plotline-chart.svg',`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${ch.width} ${ch.height}"><image width="100%" height="100%" href="${ch.toBase64Image()}"/></svg>`,'image/svg+xml');
+  else if(kind==='pdf'){
+   if(!window.jspdf)throw Error('The PDF exporter did not load.');
+   const pdf=new jspdf.jsPDF({orientation:ch.width>ch.height?'landscape':'portrait'});
+   pdf.addImage(ch.toBase64Image(),'PNG',10,10,190,Math.min(260,190*ch.height/ch.width));pdf.save('plotline-chart.pdf');
+  }
+ }catch(error){say(error.message||'Export failed.')}
+});
+</script>
+</body>
+</html>
