@@ -226,6 +226,11 @@
         background: none;
       }
 
+      .color-choices {
+        max-height: 150px;
+        overflow-y: auto;
+      }
+
       .chk {
         display: flex;
         align-items: center;
@@ -364,6 +369,10 @@
                 <input type="checkbox" id="lg" checked /> Show legend
               </label>
             </div>
+            <div style="margin-top: 10px">
+              <span class="mute" id="colorLabel">Series colors</span>
+              <div id="colorChoices" class="chips color-choices"></div>
+            </div>
           </section>
         </aside>
 
@@ -383,6 +392,12 @@
               <p id="why" class="mute"></p>
               <div class="cv">
                 <canvas id="cv" role="img" aria-label="Chart"></canvas>
+              </div>
+              <div class="row" id="zoomControls" aria-label="Chart zoom controls">
+                <button type="button" id="zoomIn" aria-label="Zoom in">Zoom in</button>
+                <button type="button" id="zoomOut" aria-label="Zoom out">Zoom out</button>
+                <button type="button" id="zoomReset">Reset view</button>
+                <span class="mute" id="zoomHint">Scroll or drag on the chart to inspect a range.</span>
               </div>
               <div class="row" id="exp">
                 <span class="mute">Export</span>
@@ -407,6 +422,8 @@
 
     <div class="tg" id="tg" hidden role="status"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.2.0/chartjs-plugin-zoom.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -415,7 +432,7 @@ const P={Studio:["#2F5BEA","#E8833A","#1E9E8A","#8B5CF6","#D6455D","#6B7A8F","#C
 const T=[['bar','Bar'],['stacked','Stacked'],['line','Line'],['area','Area'],['pie','Pie'],['scatter','Scatter']];
 const $=s=>document.querySelector(s),esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fm=n=>new Intl.NumberFormat('en',{maximumFractionDigits:2}).format(n);
-let S={rows:[],cols:[],cfg:null,rec:null,filterText:'',f:{col:'',text:'',top:0,sort:''}},ch=null;
+let S={rows:[],cols:[],cfg:null,rec:null,filterText:'',f:{col:'',text:'',top:0,sort:''}},ch=null,pieZoom=1;
 const num=v=>{if(typeof v==='number')return isFinite(v)?v:NaN;if(typeof v!=='string')return NaN;const t=v.trim().replace(/^\((.*)\)$/,'-$1').replace(/[$€£₹,\s]/g,'').replace(/%$/,'');return /^-?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(t)?parseFloat(t):NaN};
 const miss=v=>v==null||/^(|na|n\/a|null|none|nan|-|--|\?)$/i.test(String(v).trim());
 const MON='(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*';
@@ -500,7 +517,7 @@ async function rowsFromFile(file){
 }
 
 function makeConfig(recommendation){
- return{x:recommendation.x,ys:recommendation.ys,type:recommendation.type,title:'',xLabel:recommendation.x,yLabel:'',palette:'Studio',legend:true};
+ return{x:recommendation.x,ys:recommendation.ys,type:recommendation.type,title:'',xLabel:recommendation.x,yLabel:'',palette:'Studio',legend:true,colors:{series:{},slices:{}}};
 }
 
 function fillControls(){
@@ -517,7 +534,20 @@ function fillControls(){
  }));
  $('#pal').innerHTML=Object.keys(P).map(name=>`<option value="${name}">${name}</option>`).join('');
  $('#pal').value=config.palette;
- $('#pal').onchange=()=>{config.palette=$('#pal').value;drawChart()};
+ $('#pal').onchange=()=>{config.palette=$('#pal').value;fillControls();drawChart()};
+ const pieLabels=[...new Set(visibleRows().map(row=>String(row[config.x]??'')))];
+ const colorGroup=config.type==='pie'?'slices':'series';
+ const colorNames=config.type==='pie'?pieLabels:config.ys;
+ $('#colorLabel').textContent=config.type==='pie'?'Slice colors':'Series colors';
+ $('#colorChoices').innerHTML=colorNames.map((name,index)=>{
+  const fallback=(P[config.palette]||P.Studio)[index%(P[config.palette]||P.Studio).length];
+  const color=config.colors[colorGroup][name]||fallback;
+  return `<label><input type="color" data-color-group="${colorGroup}" data-color-key="${esc(name)}" value="${color}" aria-label="Color for ${esc(name)}">${esc(name)}</label>`;
+ }).join('');
+ $('#colorChoices').querySelectorAll('input[type="color"]').forEach(input=>input.addEventListener('input',()=>{
+  config.colors[input.dataset.colorGroup][input.dataset.colorKey]=input.value;
+  drawChart();
+ }));
  $('#ttl').value=config.title;
  $('#ttl').oninput=()=>{config.title=$('#ttl').value;drawChart()};
  $('#xl').value=config.xLabel;
@@ -546,18 +576,25 @@ function drawChart(){
  if(config.type==='scatter'){
   const xColumn=S.cols.find(column=>column.name===config.x);
   if(!xColumn||xColumn.type!=='num')throw Error('Scatter charts need a numeric X axis. Choose one in the X axis menu.');
-  data={datasets:config.ys.map((name,index)=>({label:name,data:rows.map(row=>({x:num(row[config.x]),y:num(row[name])})).filter(point=>isFinite(point.x)&&isFinite(point.y)),backgroundColor:colors[index%colors.length]}))};
+  data={datasets:config.ys.map((name,index)=>({label:name,data:rows.map(row=>({x:num(row[config.x]),y:num(row[name])})).filter(point=>isFinite(point.x)&&isFinite(point.y)),backgroundColor:config.colors.series[name]||colors[index%colors.length]}))};
  }else{
   const labels=rows.map(row=>String(row[config.x]??''));
   const series=config.type==='pie'?config.ys.slice(0,1):config.ys;
-  data={labels,datasets:series.map((name,index)=>({label:name,data:rows.map(row=>miss(row[name])?null:num(row[name])),backgroundColor:config.type==='pie'?labels.map((_,item)=>colors[item%colors.length]):colors[index%colors.length],borderColor:colors[index%colors.length],borderWidth:2,tension:.25,fill:config.type==='area'}))};
+  data={labels,datasets:series.map((name,index)=>{
+   const sliceColors=labels.map((label,item)=>config.colors.slices[label]||colors[item%colors.length]);
+   const seriesColor=config.colors.series[name]||colors[index%colors.length];
+  return{label:name,data:rows.map(row=>miss(row[name])?null:num(row[name])),backgroundColor:config.type==='pie'?sliceColors:seriesColor,borderColor:config.type==='pie'?sliceColors:seriesColor,borderWidth:2,tension:.25,fill:config.type==='area'};
+  })};
  }
  const ink=getComputedStyle(document.documentElement).getPropertyValue('--ink').trim();
  const mute=getComputedStyle(document.documentElement).getPropertyValue('--mute').trim();
  const grid=getComputedStyle(document.documentElement).getPropertyValue('--grid').trim();
- const options={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:config.legend,labels:{color:mute}},title:{display:Boolean(config.title),text:config.title,color:ink}},scales:{}};
+ const options={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:config.legend,labels:{color:mute}},title:{display:Boolean(config.title),text:config.title,color:ink},zoom:{zoom:{wheel:{enabled:true},pinch:{enabled:true},drag:{enabled:true,threshold:4},mode:'xy'},pan:{enabled:true,mode:'xy'}}},scales:{}};
+ $('#zoomControls').hidden=false;
+ $('#zoomHint').textContent=config.type==='pie'?'Scroll over the pie or use the buttons to zoom.':'Scroll or drag on the chart to inspect a range.';
+ if(config.type==='pie')options.radius=`${Math.round(pieZoom*100)}%`;
  if(!['pie'].includes(config.type)){
-  options.scales={x:{title:{display:Boolean(config.xLabel),text:config.xLabel,color:mute},ticks:{color:mute},grid:{color:grid},stacked:config.type==='stacked'},y:{title:{display:Boolean(config.yLabel),text:config.yLabel,color:mute},ticks:{color:mute},grid:{color:grid},stacked:config.type==='stacked',beginAtZero:config.type==='bar'||config.type==='stacked'}};
+  options.scales={x:{title:{display:Boolean(config.xLabel),text:config.xLabel,color:mute},ticks:{color:mute,autoSkip:true,maxTicksLimit:12},grid:{color:grid},stacked:config.type==='stacked'},y:{title:{display:Boolean(config.yLabel),text:config.yLabel,color:mute},ticks:{color:mute,maxTicksLimit:8},grid:{color:grid},stacked:config.type==='stacked',beginAtZero:config.type==='bar'||config.type==='stacked'}};
  }
  ch=new Chart($('#cv'),{type,data,options});
  say('');
@@ -618,6 +655,27 @@ $('#smp').addEventListener('click',()=>{
   $('#src').value='Month,Visitors,Signups\nJan,120,24\nFeb,155,31\nMar,138,29\nApr,192,42\nMay,176,39';
   $('#go').click();
 });
+function zoomChart(factor){
+ if(!ch)return;
+ if(S.cfg?.type==='pie'){
+  pieZoom=Math.min(1.2,Math.max(.8,pieZoom*factor));
+  ch.options.radius=`${Math.round(pieZoom*100)}%`;
+  ch.update('none');
+ }else ch.zoom(factor);
+}
+$('#zoomIn').addEventListener('click',()=>zoomChart(1.15));
+$('#zoomOut').addEventListener('click',()=>zoomChart(1/1.15));
+$('#zoomReset').addEventListener('click',()=>{
+ if(S.cfg?.type==='pie'){
+  pieZoom=1;
+  if(ch){ch.options.radius='100%';ch.update('none')}
+ }else ch?.resetZoom();
+});
+$('#cv').addEventListener('wheel',event=>{
+ if(S.cfg?.type!=='pie')return;
+ event.preventDefault();
+ zoomChart(event.deltaY<0?1.08:1/1.08);
+},{passive:false});
 $('#ask').addEventListener('click',()=>{
  const request=$('#cmd').value.trim().toLowerCase();
  if(!request){$('#reply').textContent='Enter a chart change first.';return}
